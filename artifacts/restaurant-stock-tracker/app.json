@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "Mutfak Stok Takibi",
-    "slug": "restaurant-stock-tracker",
+    "name": "Kontrol Sende",
+    "slug": "kontrolsende",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "restaurant-stock-tracker",
+    "scheme": "kontrolsende",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "splash": {
@@ -14,9 +14,12 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": false
+      "supportsTablet": false,
+      "bundleIdentifier": "com.kontrolsende.app"
     },
-    "android": {},
+    "android": {
+      "package": "com.kontrolsende.app"
+    },
     "web": {
       "favicon": "./assets/images/icon.png",
       "name": "Mutfak Stok Takibi",
