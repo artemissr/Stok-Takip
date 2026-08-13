@@ -1,0 +1,44 @@
+{
+  "expo": {
+    "name": "Mutfak Stok Takibi",
+    "slug": "restaurant-stock-tracker",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "scheme": "restaurant-stock-tracker",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/images/icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "ios": {
+      "supportsTablet": false
+    },
+    "android": {},
+    "web": {
+      "favicon": "./assets/images/icon.png",
+      "name": "Mutfak Stok Takibi",
+      "shortName": "Mutfak Stok",
+      "description": "Restoran ve kafeler için stok, SKT ve satış takibi",
+      "themeColor": "#1f6b52",
+      "backgroundColor": "#f6f3ed",
+      "lang": "tr"
+    },
+    "plugins": [
+      [
+        "expo-router",
+        {
+          "origin": "https://replit.com/"
+        }
+      ],
+      "expo-font",
+      "expo-web-browser"
+    ],
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true
+    }
+  }
+}

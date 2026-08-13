@@ -1,0 +1,19 @@
+{
+  "name": "Mutfak Stok Takibi",
+  "short_name": "Mutfak Stok",
+  "description": "Restoran ve kafeler için stok, SKT ve satış takibi",
+  "lang": "tr",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f6f3ed",
+  "theme_color": "#1f6b52",
+  "icons": [
+    {
+      "src": "/assets/images/icon.png",
+      "sizes": "1024x1024",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

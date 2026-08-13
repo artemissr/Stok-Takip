@@ -1,0 +1,24 @@
+kind = "mobile"
+previewPath = "/"
+title = "Mutfak Stok Takibi"
+description = "Tek bir restoran veya kafe için ürün, reçete, stok, SKT, satış, fire, iade ve sipariş eşiği takibi sunan; mobil tarayıcıda çalışıp ana ekrana eklenebilen sade bir stok yönetim uygulaması."
+version = "1.0.0"
+id = "artifacts/restaurant-stock-tracker"
+router = "expo-domain"
+
+[[services]]
+name = "expo"
+ensurePreviewReachable = "/status"
+paths = [ "/" ]
+localPort = 21551
+
+[services.development]
+run = "pnpm --filter @workspace/restaurant-stock-tracker run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/restaurant-stock-tracker", "run", "build" ]
+run = [ "pnpm", "--filter", "@workspace/restaurant-stock-tracker", "run", "serve" ]
+
+[services.env]
+PORT = "21551"
+BASE_PATH = "/"
