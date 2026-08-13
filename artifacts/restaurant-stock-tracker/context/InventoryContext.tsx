@@ -1,7 +1,11 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 
-export type Area = 'Soğuk depo' | 'Kuru depo' | 'Bar' | 'Dondurucu';
+export type MainCategory = 'Bar' | 'Mutfak' | 'Tezgah';
+export type Area = 'Soğuk depo' | 'Kuru depo' | 'Bar' | 'Dondurucu' | 'Sarf malzeme';
+
+export const MAIN_CATEGORIES: MainCategory[] = ['Bar', 'Mutfak', 'Tezgah'];
+export const AREAS: Area[] = ['Soğuk depo', 'Kuru depo', 'Bar', 'Dondurucu', 'Sarf malzeme'];
 
 export type Ingredient = {
   id: string;
@@ -10,7 +14,12 @@ export type Ingredient = {
   buyPrice: number;
   salePrice: number;
   area: Area;
+  mainCategory: MainCategory;
   threshold: number;
+  content: string;
+  calories: number;
+  allergens: string[];
+  barcode?: string;
 };
 
 export type Batch = {
@@ -20,6 +29,7 @@ export type Batch = {
   expiryDate: string;
   receivedAt: string;
   area: Area;
+  imageUri?: string;
 };
 
 export type RecipeIngredient = {
@@ -55,11 +65,13 @@ type InventoryData = {
   recipes: Recipe[];
   sales: Sale[];
   returns: ReturnRecord[];
+  schedules: {
+    orderDays: number[];
+    shipmentDays: number[];
+  };
 };
 
 const STORAGE_KEY = '@mutfak-stok-takibi/v1';
-export const AREAS: Area[] = ['Soğuk depo', 'Kuru depo', 'Bar', 'Dondurucu'];
-
 const id = (prefix: string) =>
   `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
@@ -74,12 +86,12 @@ export const today = () => new Date().toISOString().slice(0, 10);
 
 export const starterData: InventoryData = {
   ingredients: [
-    { id: 'ingredient-tomato', name: 'Domates', unit: 'kg', buyPrice: 42, salePrice: 75, area: 'Soğuk depo', threshold: 8 },
-    { id: 'ingredient-mozzarella', name: 'Mozzarella', unit: 'kg', buyPrice: 180, salePrice: 320, area: 'Soğuk depo', threshold: 4 },
-    { id: 'ingredient-pasta', name: 'Penne makarna', unit: 'kg', buyPrice: 58, salePrice: 96, area: 'Kuru depo', threshold: 10 },
-    { id: 'ingredient-basil', name: 'Taze fesleğen', unit: 'demet', buyPrice: 35, salePrice: 70, area: 'Soğuk depo', threshold: 5 },
-    { id: 'ingredient-beans', name: 'Espresso çekirdeği', unit: 'kg', buyPrice: 480, salePrice: 720, area: 'Bar', threshold: 2 },
-    { id: 'ingredient-milk', name: 'Süt', unit: 'L', buyPrice: 38, salePrice: 65, area: 'Soğuk depo', threshold: 10 },
+    { id: 'ingredient-tomato', name: 'Domates', unit: 'kg', buyPrice: 42, salePrice: 75, area: 'Soğuk depo', mainCategory: 'Mutfak', threshold: 8, content: 'Taze kırmızı domates', calories: 18, allergens: [] },
+    { id: 'ingredient-mozzarella', name: 'Mozzarella', unit: 'kg', buyPrice: 180, salePrice: 320, area: 'Soğuk depo', mainCategory: 'Mutfak', threshold: 4, content: 'İnek sütü, peynir kültürü, tuz', calories: 280, allergens: ['Süt'] },
+    { id: 'ingredient-pasta', name: 'Penne makarna', unit: 'kg', buyPrice: 58, salePrice: 96, area: 'Kuru depo', mainCategory: 'Mutfak', threshold: 10, content: 'Durum buğdayı irmiği, su', calories: 350, allergens: ['Gluten'] },
+    { id: 'ingredient-basil', name: 'Taze fesleğen', unit: 'demet', buyPrice: 35, salePrice: 70, area: 'Soğuk depo', mainCategory: 'Mutfak', threshold: 5, content: 'Taze fesleğen yaprakları', calories: 23, allergens: [] },
+    { id: 'ingredient-beans', name: 'Espresso çekirdeği', unit: 'kg', buyPrice: 480, salePrice: 720, area: 'Bar', mainCategory: 'Bar', threshold: 2, content: 'Arabica kahve çekirdeği', calories: 2, allergens: [], barcode: '8690000000011' },
+    { id: 'ingredient-milk', name: 'Süt', unit: 'L', buyPrice: 38, salePrice: 65, area: 'Soğuk depo', mainCategory: 'Bar', threshold: 10, content: 'Pastörize inek sütü', calories: 61, allergens: ['Süt'], barcode: '8690000000028' },
   ],
   batches: [
     { id: 'batch-tomato', ingredientId: 'ingredient-tomato', quantity: 14, expiryDate: dateFromToday(2), receivedAt: today(), area: 'Soğuk depo' },
@@ -127,6 +139,7 @@ export const starterData: InventoryData = {
     { id: 'sale-3', recipeId: 'recipe-pasta', quantity: 6, date: today() },
   ],
   returns: [],
+  schedules: { orderDays: [2, 5], shipmentDays: [2, 4, 6] },
 };
 
 type InventoryContextValue = InventoryData & {
@@ -135,6 +148,7 @@ type InventoryContextValue = InventoryData & {
   addShipment: (input: Omit<Batch, 'id' | 'receivedAt'>) => void;
   addRecipe: (input: Omit<Recipe, 'id'>) => void;
   addReturn: (input: Omit<ReturnRecord, 'id'>) => void;
+  updateSchedules: (schedules: InventoryData['schedules']) => void;
   recordSale: (recipeId: string, quantity: number) => boolean;
 };
 
@@ -187,6 +201,8 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
         ...previous,
         returns: [...previous.returns, { ...input, id: id('return') }],
       })),
+    updateSchedules: (schedules) =>
+      setData((previous) => ({ ...previous, schedules })),
     recordSale: (recipeId, quantity) => {
       const recipe = data.recipes.find((item) => item.id === recipeId);
       if (!recipe || quantity <= 0) return false;
