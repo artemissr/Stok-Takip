@@ -1,0 +1,39 @@
+Mevcut kategori hiyerarşisi, ürün içerik/alerjen bilgisi, arama, dönemsel analiz, sipariş/sevkiyat takibi ve bildirim altyapısını koruyarak üzerine inşa et, mevcut veriyi bozma.
+
+1) KATEGORİ YAPISI: Dondurucu/Soğuk Depo/Kutu Depo/Bar gibi ana bölümlerin altına kullanıcının kendi oluşturduğu başlıklar (örn. Soğuk Depo > Süt Ürünleri) eklenebilsin. Ana bölüme girildiğinde önce başlıklar listelensin, başlığa tıklayınca içindeki ürün+adet görünsün. Ana bölüm isimleri de kullanıcı tarafından yeniden adlandırılabilir/silinebilir/eklenebilir olsun (sabit metin olmasın).
+
+2) ÜRÜN EKLEME: Görsel yükleyince ürün adı/miktar OCR ile otomatik okunsun. Barkod kamera ile taransın, ürün bilgisi otomatik gelsin ve barkod ürüne kaydedilsin (manuel barkod girişi olmasın). Ekleme sırasında görsel/barkod/manuel seçenekleri sunulsun.
+
+3) KOLİ İÇERİĞİ: Ürün eklerken koli/kutu içeriği adedi girilebilsin; bu bilgi ürün bazında değil başlık (alt kategori) bazında sorulsun, "hepsi" seçeneğiyle tüm ürünlere aynı adet uygulanabilsin. Mamul ürünlerde tekil kutu içeriği ayrıca girilebilsin. Bu alan zorunlu olmasın.
+
+4) SKT: Donuk ürünlerde SKT girişi zorunlu olmasın. SKT renk uyarısı (yeşil/sarı/kırmızı) sadece kalan güne değil ürünün satış hızına göre hesaplanan tükenme tahminine baksın: tahmini tükenme süresi × 1.10 SKT'yi aşıyorsa sarı, × 1.20 aşıyorsa kırmızı.
+
+5) REÇETE: Reçete ekranında görsel tarama ile otomatik doldurma olsun (fotoğraftaki malzeme/miktar bilgisini okuyup formu doldursun).
+
+6) MENÜ: QR kod okutulunca menünün tamamı (görsel, içerik, yazı) otomatik menü bölümüne eklensin.
+
+7) ARAMA: Arama sadece ürün/içerik değil, yapılmak istenen işlemi de bulabilsin (örn. "ürün ekleme" yazınca ilgili ekrana yönlendirsin).
+
+8) SOL PANEL: Sol tarafta açılır bir panel olsun, başlıklar kullanıcı tarafından oluşturulabilir/düzenlenebilir olsun (varsayılan öneri: Bar, Tezgah, Mutfak, Menü, Döviz, Ekip). Başlığa tıklayınca ürün+adet listelensin, ürüne tıklayınca içerik/alerji/alış-satış fiyatı gibi tüm bilgiler açılsın. Döviz güncel kur çeksin.
+
+9) RAPOR/ANALİZ: Rapor ekranında ürün bazlı satış sayısı gösterilsin. Analiz ekranına başlangıç-bitiş tarih aralığı filtresi eklensin.
+
+10) VERİ KALICILIĞI: Uygulama güncellemelerinde girilen veriler asla sıfırlanmasın.
+
+11) SEVKİYAT: Sevkiyat geçmişi görüntülenebilsin.
+
+12) İADE: İade edilen ürünler "tedarikçiye iade" olarak işaretlenip takip edilsin (stoğa geri eklenmiyor, sadece kayıt).
+
+13) SATIŞ ANALİZ ÖNERİLERİ: Almayı bırak/az al/kampanya yap gibi öneriler sadece öneri olarak gösterilsin; kullanıcı onaylamadan hiçbir aksiyon otomatik alınmasın.
+
+14) YETKİLENDİRME: Profil ekranında isim-soyisim ve yetki seçimi olsun. Yönetim dışı profiller finans bilgilerini göremesin. Yetkiler profil yönetim ekranından tek tek açılıp kapatılabilsin (ürün ekle/çıkar, sayım, fiyat görme, zarar/fire girme, rapor görüntüleme, kategori/başlık oluşturma vb.), her profil farklı yetki setine sahip olabilsin. Bu profillerin yaptığı işlemler bir aktivite geçmişinde görüntülenebilsin.
+
+15) FATURA: Fatura görseli çekilip kaydedilebilsin, ilgili sevkiyat/ürün kaydıyla ilişkilendirilsin.
+
+16) İSİM DEĞİŞİKLİĞİ: Uygulama adını "Stok Kontrolüm" olarak güncelle.
+
+17) SESLİ KOMUT: Sesli komutla hem işlem yapılabilsin (ürün ekleme, "menüyü aç" gibi navigasyon) hem de soru sorulup sesli/yazılı cevap alınabilsin (örn. "kaç tane X var?" → "5 tane").
+
+18) POS ENTEGRASYONU (opsiyonel): POS bağlantısı isteğe bağlı bir ayar olarak eklensin; bağlanırsa günlük satılan ürün stoktan otomatik düşsün, bağlanmazsa mevcut manuel giriş akışı çalışmaya devam etsin.
+
+19) ÖZELLEŞTİRİLEBİLİR AYARLAR (İLERİDEKİ ÇOK KULLANICILI YAYIN İÇİN ÖNEMLİ): Aşağıdaki ayarları koda sabit yazma, kurulum/onboarding ekranında kullanıcıya sorup seçtir, sonradan ayarlardan da değiştirilebilir yap: SKT sarı/kırmızı eşik yüzdeleri, iade akışı türü, koli içeriği zorunluluğu, yönetim dışı profillerin varsayılan yetkileri, minimum stok/sipariş eşiği, ana bölüm isimleri, sol panel başlıkları.
