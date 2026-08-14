@@ -379,6 +379,35 @@ function ScheduleModal({ onClose }: { onClose: () => void }) {
   return <Modal visible transparent animationType="slide" onRequestClose={onClose}><View style={styles.modalBackdrop}><View style={styles.modalCard}><View style={styles.modalHeader}><Text style={styles.modalTitle}>Bildirim takvimi</Text><Pressable onPress={onClose} style={styles.closeButton}><Icon name="x" size={20} color={colors.light.foreground} /></Pressable></View><ScrollView contentContainerStyle={styles.modalContent}><Text style={styles.scheduleIntro}>Sipariş listesi ve sevkiyat hatırlatmaları seçtiğin günlerde saat 09:00 ve 10:00'da telefonuna gelir.</Text><Text style={styles.formSectionLabel}>Sipariş listesi günleri</Text><View style={styles.weekRow}>{WEEK_DAYS.map((day) => <Pressable key={day.value} onPress={() => setOrderDays((current) => toggle(current, day.value))} style={[styles.dayChip, orderDays.includes(day.value) && styles.dayChipActive]}><Text style={[styles.dayChipText, orderDays.includes(day.value) && styles.dayChipTextActive]}>{day.label}</Text></Pressable>)}</View><Text style={styles.formSectionLabel}>Sevkiyat günleri</Text><View style={styles.weekRow}>{WEEK_DAYS.map((day) => <Pressable key={day.value} onPress={() => setShipmentDays((current) => toggle(current, day.value))} style={[styles.dayChip, shipmentDays.includes(day.value) && styles.dayChipActive]}><Text style={[styles.dayChipText, shipmentDays.includes(day.value) && styles.dayChipTextActive]}>{day.label}</Text></Pressable>)}</View><View style={styles.notificationNote}><Icon name="bell" size={17} color={colors.light.primary} /><Text style={styles.localNoteText}>Bildirim için uygulamayı kapatmana gerek yok; telefonun bildirim merkezinden görebilirsin.</Text></View><PrimaryButton label="Takvimi kaydet ve bildirimleri aç" icon="bell" onPress={save} /></ScrollView></View></View></Modal>;
 }
 
+function OrderListModal({ onClose }: { onClose: () => void }) {
+  const { ingredients, batches, recipes, sales, schedules } = useInventory();
+  const [period, setPeriod] = useState<PeriodKey>('3m');
+  const selectedPeriod = PERIODS.find((item) => item.key === period) ?? PERIODS[3];
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - selectedPeriod.days);
+  const cutoffKey = cutoff.toISOString().slice(0, 10);
+  const periodSales = sales.filter((sale) => sale.date >= cutoffKey);
+  const rows = ingredients.map((ingredient) => {
+    const usage = periodSales.reduce((sum, sale) => {
+      const recipe = recipes.find((item) => item.id === sale.recipeId);
+      const line = recipe?.ingredients.find((item) => item.ingredientId === ingredient.id);
+      return sum + (line?.quantity ?? 0) * sale.quantity;
+    }, 0);
+    const weekendUsage = periodSales.filter((sale) => [0, 6].includes(new Date(`${sale.date}T12:00:00`).getDay())).reduce((sum, sale) => {
+      const recipe = recipes.find((item) => item.id === sale.recipeId);
+      const line = recipe?.ingredients.find((item) => item.ingredientId === ingredient.id);
+      return sum + (line?.quantity ?? 0) * sale.quantity;
+    }, 0);
+    const dailyAverage = usage / Math.max(selectedPeriod.days, 1);
+    const coverageDays = Math.max(2, Math.ceil(7 / Math.max(schedules.orderDays.length, 1)));
+    const stock = stockFor(batches, ingredient.id);
+    const target = Math.max(ingredient.threshold, dailyAverage * coverageDays);
+    return { ingredient, usage, weekendUsage, stock, suggestion: Math.max(0, Math.ceil(target - stock)), coverageDays };
+  }).filter((row) => row.suggestion > 0 || row.stock <= row.ingredient.threshold).sort((a, b) => b.suggestion - a.suggestion);
+
+  return <Modal visible transparent animationType="slide" onRequestClose={onClose}><View style={styles.modalBackdrop}><View style={styles.modalCard}><View style={styles.modalHeader}><View><Text style={styles.eyebrow}>GEÇMİŞ SATIŞ ANALİZİ</Text><Text style={styles.modalTitle}>Sipariş listen hazır</Text></View><Pressable onPress={onClose} style={styles.closeButton}><Icon name="x" size={20} color={colors.light.foreground} /></Pressable></View><ScrollView contentContainerStyle={styles.modalContent}><Text style={styles.scheduleIntro}>Son satışları ve mevcut sayımı karşılaştırarak bir sonraki sipariş gününe kadar yetecek örnek miktarı hesapladım. Hafta sonu tüketimi ayrı gösterilir.</Text><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>{PERIODS.slice(2).map((item) => <Pressable key={item.key} onPress={() => setPeriod(item.key)} style={[styles.filterChip, period === item.key && styles.filterChipActive]}><Text style={[styles.filterChipText, period === item.key && styles.filterChipTextActive]}>{item.label}</Text></Pressable>)}</ScrollView>{rows.length === 0 ? <EmptyState icon="check-circle" title="Sipariş gerekmiyor" copy="Mevcut stokların eşik üstünde görünüyor." /> : <View style={styles.cardList}>{rows.map((row) => <View style={styles.orderRow} key={row.ingredient.id}><View style={styles.stockGlyph}><Icon name="shopping-cart" size={17} color={colors.light.primary} /></View><View style={{ flex: 1 }}><Text style={styles.rowTitle}>{row.ingredient.name}</Text><Text style={styles.rowMeta}>Mevcut {row.stock.toFixed(1)} {row.ingredient.unit} · son {selectedPeriod.days} günde {row.usage.toFixed(1)} tüketim</Text><Text style={styles.orderMeta}>Hafta sonu: {row.weekendUsage.toFixed(1)} · Sipariş aralığı: {row.coverageDays} gün</Text></View><View style={styles.orderAmount}><Text style={styles.orderAmountValue}>{row.suggestion}</Text><Text style={styles.stockUnit}>{row.ingredient.unit} al</Text></View></View>)}</View>}<View style={styles.notificationNote}><Icon name="calendar" size={17} color={colors.light.primary} /><Text style={styles.localNoteText}>Sipariş günlerin: {schedules.orderDays.length} gün/hafta. Resmî tatil ve özel gün satışlarını ayrıca kaydettiğinde öneri geçmiş veriye göre güncellenir.</Text></View></ScrollView></View></View></Modal>;
+}
+
 function FormModal({ type, onClose }: { type: FormModalType; onClose: () => void }) {
   const { ingredients, addIngredient, addShipment, addRecipe, addReturn } = useInventory();
   const [name, setName] = useState('');
@@ -472,7 +501,7 @@ export default function HomeScreen() {
     { key: 'more', label: 'Daha', icon: 'more-horizontal' },
   ];
   if (!hydrated) return <View style={styles.loading}><ActivityIndicator color={colors.light.primary} /><Text style={styles.loadingText}>Mutfak hazırlanıyor...</Text></View>;
-  return <View style={[styles.app, { paddingTop: Platform.OS === 'web' ? 0 : 0 }]}><View style={{ flex: 1 }}>{content}</View><View style={[styles.bottomNav, { paddingBottom: Platform.OS === 'web' ? 34 : Math.max(insets.bottom, 8), height: Platform.OS === 'web' ? 84 : 72 }]}>{navItems.map((item) => <Pressable testID={`nav-${item.key}`} key={item.key} onPress={() => setSection(item.key)} style={({ pressed }) => [styles.navItem, pressed && styles.pressed]}><View style={[styles.navIcon, section === item.key && styles.navIconActive]}><Icon name={item.icon} size={19} color={section === item.key ? colors.light.primary : colors.light.mutedForeground} /></View><Text style={[styles.navLabel, section === item.key && styles.navLabelActive]}>{item.label}</Text></Pressable>)}</View>{modal === 'schedule' ? <ScheduleModal onClose={() => setModal(null)} /> : modal === 'ingredientDetail' && selectedIngredient ? <IngredientDetailModal ingredientId={selectedIngredient} onClose={() => setModal(null)} /> : modal && ['ingredient', 'shipment', 'recipe', 'return'].includes(modal) ? <FormModal type={modal as FormModalType} onClose={() => setModal(null)} /> : null}</View>;
+  return <View style={[styles.app, { paddingTop: Platform.OS === 'web' ? 0 : 0 }]}><View style={{ flex: 1 }}>{content}</View><View style={[styles.bottomNav, { paddingBottom: Platform.OS === 'web' ? 34 : Math.max(insets.bottom, 8), height: Platform.OS === 'web' ? 84 : 72 }]}>{navItems.map((item) => <Pressable testID={`nav-${item.key}`} key={item.key} onPress={() => setSection(item.key)} style={({ pressed }) => [styles.navItem, pressed && styles.pressed]}><View style={[styles.navIcon, section === item.key && styles.navIconActive]}><Icon name={item.icon} size={19} color={section === item.key ? colors.light.primary : colors.light.mutedForeground} /></View><Text style={[styles.navLabel, section === item.key && styles.navLabelActive]}>{item.label}</Text></Pressable>)}</View>{modal === 'schedule' ? <ScheduleModal onClose={() => setModal(null)} /> : modal === 'orderList' ? <OrderListModal onClose={() => setModal(null)} /> : modal === 'ingredientDetail' && selectedIngredient ? <IngredientDetailModal ingredientId={selectedIngredient} onClose={() => setModal(null)} /> : modal && ['ingredient', 'shipment', 'recipe', 'return'].includes(modal) ? <FormModal type={modal as FormModalType} onClose={() => setModal(null)} /> : null}</View>;
 }
 
 const styles = StyleSheet.create({
@@ -573,6 +602,10 @@ const styles = StyleSheet.create({
   reportMetric: { width: 48, alignItems: 'flex-end' },
   reportMetricValue: { fontFamily: 'Inter_700Bold', color: colors.light.foreground, fontSize: 12 },
   reportMetricLabel: { fontFamily: 'Inter_400Regular', color: colors.light.mutedForeground, fontSize: 8, marginTop: 3 },
+  orderRow: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 13, borderBottomWidth: 1, borderBottomColor: colors.light.border },
+  orderMeta: { fontFamily: 'Inter_500Medium', color: colors.light.primary, fontSize: 10, marginTop: 6 },
+  orderAmount: { alignItems: 'flex-end', minWidth: 45 },
+  orderAmountValue: { fontFamily: 'Inter_700Bold', color: colors.light.primary, fontSize: 20 },
   analysisModeRow: { flexDirection: 'row', gap: 8, marginBottom: 18 },
   analysisMode: { flex: 1, borderRadius: 11, paddingVertical: 10, alignItems: 'center', backgroundColor: colors.light.muted },
   analysisModeActive: { backgroundColor: colors.light.secondary, borderWidth: 1, borderColor: '#b7d2bd' },
