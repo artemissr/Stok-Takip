@@ -1,0 +1,44 @@
+name: Apply shipment product search
+
+on:
+  push:
+    paths:
+      - 'artifacts/restaurant-stock-tracker/app/index.tsx'
+      - '.github/workflows/apply-shipment-product-search.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: ${{ !contains(github.event.head_commit.message, '[shipment-search]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Add shipment product search
+        shell: python
+        run: |
+          from pathlib import Path
+          p = Path('artifacts/restaurant-stock-tracker/app/index.tsx')
+          s = p.read_text(encoding='utf-8')
+
+          state_old = "  const [ingredientId, setIngredientId] = useState(ingredients[0]?.id ?? '');\n"
+          state_new = state_old + "  const [shipmentProductQuery, setShipmentProductQuery] = useState('');\n"
+          if "shipmentProductQuery" not in s:
+              if state_old not in s:
+                  raise SystemExit('ingredient state anchor not found')
+              s = s.replace(state_old, state_new, 1)
+
+          old = '''    {type === 'shipment' ? <><SelectRow label="Ürün" options={ingredients.map((item) => item.name)} value={ingredients.find((item) => item.id === ingredientId)?.name ?? ''} onChange={(value) => setIngredientId(ingredients.find((item) => item.name === value)?.id ?? '')} /><View style={styles.scannerActions}><PrimaryButton label="Barkod tara" icon="camera" onPress={() => setScannerVisible(true)} secondary compact /><PrimaryButton label="Görsel ekle" icon="image" onPress={pickShipmentImage} secondary compact /></View>{photoUri ? <View style={styles.photoAttached}><Icon name="check-circle" size={16} color={colors.light.primary} /><Text style={styles.rowMeta}>Sevkiyat görseli eklendi</Text></View> : null}<Field label="Miktar" value={quantity} onChangeText={setQuantity} placeholder="0" keyboardType="decimal-pad" /><Field label="Son kullanma tarihi" value={expiryDate} onChangeText={setExpiryDate} placeholder="YYYY-AA-GG" /><SelectRow label="Depo alanı" options={AREAS} value={area} onChange={(value) => setArea(value as Area)} /></> : null}'''
+          new = '''    {type === 'shipment' ? <><View style={styles.field}><Text style={styles.fieldLabel}>Ürün</Text><View style={styles.searchBox}><Icon name="search" size={18} color={colors.light.mutedForeground} /><TextInput value={shipmentProductQuery} onChangeText={setShipmentProductQuery} placeholder="Ürün ara..." placeholderTextColor={colors.light.mutedForeground} style={styles.searchInput} /></View><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.selectRow}>{ingredients.filter((item) => item.name.toLocaleLowerCase('tr').includes(shipmentProductQuery.toLocaleLowerCase('tr'))).map((item) => <Pressable key={item.id} onPress={() => setIngredientId(item.id)} style={[styles.selectOption, ingredientId === item.id && styles.selectOptionActive]}><Text style={[styles.selectOptionText, ingredientId === item.id && styles.selectOptionTextActive]}>{item.name}</Text></Pressable>)}</ScrollView>{ingredients.filter((item) => item.name.toLocaleLowerCase('tr').includes(shipmentProductQuery.toLocaleLowerCase('tr'))).length === 0 ? <Text style={styles.rowMeta}>Ürün bulunamadı.</Text> : null}</View><View style={styles.scannerActions}><PrimaryButton label="Barkod tara" icon="camera" onPress={() => setScannerVisible(true)} secondary compact /><PrimaryButton label="Görsel ekle" icon="image" onPress={pickShipmentImage} secondary compact /></View>{photoUri ? <View style={styles.photoAttached}><Icon name="check-circle" size={16} color={colors.light.primary} /><Text style={styles.rowMeta}>Sevkiyat görseli eklendi</Text></View> : null}<Field label="Miktar" value={quantity} onChangeText={setQuantity} placeholder="0" keyboardType="decimal-pad" /><Field label="Son kullanma tarihi" value={expiryDate} onChangeText={setExpiryDate} placeholder="YYYY-AA-GG" /><SelectRow label="Depo alanı" options={AREAS} value={area} onChange={(value) => setArea(value as Area)} /></> : null}'''
+          if old not in s:
+              raise SystemExit('shipment product block not found')
+          s = s.replace(old, new, 1)
+          p.write_text(s, encoding='utf-8')
+      - name: Commit change
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add artifacts/restaurant-stock-tracker/app/index.tsx
+          git diff --cached --quiet || git commit -m "Add shipment product search [shipment-search]"
+          git push
