@@ -32,8 +32,8 @@ import {
 } from '@/context/InventoryContext';
 
 type Section = 'summary' | 'sales' | 'stock' | 'reports' | 'more';
-type ModalType = 'ingredient' | 'shipment' | 'recipe' | 'return' | 'schedule' | 'ingredientDetail' | 'orderList' | null;
-type FormModalType = 'ingredient' | 'shipment' | 'recipe' | 'return';
+type ModalType = 'ingredient' | 'shipment' | 'recipe' | 'return' | 'subcategory' | 'schedule' | 'ingredientDetail' | 'orderList' | null;
+type FormModalType = 'ingredient' | 'shipment' | 'recipe' | 'return' | 'subcategory';
 type PeriodKey = '3d' | 'week' | 'month' | '3m' | '6m' | '9m' | 'year';
 
 const PERIODS: { key: PeriodKey; label: string; days: number }[] = [
@@ -124,33 +124,25 @@ function Dashboard({ onNavigate, onOpen }: { onNavigate: (section: Section) => v
         </View>
         <View style={styles.leafBadge}><Icon name="sun" size={22} color={colors.light.accentForeground} /></View>
       </View>
-
       <View style={styles.metricsGrid}>
         <View style={[styles.metricCard, styles.metricCardGreen]}><Text style={styles.metricLabel}>STOK DEĞERİ</Text><Text style={styles.metricValue}>{money(stockValue)}</Text><Text style={styles.metricHint}>alış fiyatı üzerinden</Text></View>
         <View style={styles.metricCard}><Text style={styles.metricLabel}>BUGÜN SATIŞ</Text><Text style={styles.metricValue}>{todaySales}</Text><Text style={styles.metricHint}>porsiyon / ürün</Text></View>
         <View style={[styles.metricCard, expiring.length > 0 && styles.metricCardWarm]}><Text style={styles.metricLabel}>SKT YAKLAŞAN</Text><Text style={styles.metricValue}>{expiring.length}</Text><Text style={styles.metricHint}>3 gün içinde</Text></View>
         <Pressable style={styles.metricCard} onPress={() => onOpen('orderList')}><Text style={styles.metricLabel}>SİPARİŞ LİSTESİ</Text><Text style={styles.metricValue}>{lowStock.length}</Text><Text style={styles.metricHint}>öneri listesi · aç</Text></Pressable>
       </View>
-
       <View style={styles.quickActions}>
         <PrimaryButton label="Satış gir" icon="plus" onPress={() => onNavigate('sales')} />
         <PrimaryButton label="Sevkiyat ekle" icon="package" onPress={() => onOpen('shipment')} secondary />
       </View>
-
       <SectionHeading title="SKT radar" action="Stokta gör" onAction={() => onNavigate('stock')} />
       {expiring.length === 0 ? <EmptyState icon="check-circle" title="Raflar güvende" copy="Önümüzdeki 3 günde sona erecek ürün yok." /> : (
         <View style={styles.cardList}>
           {expiring.slice(0, 4).map((batch) => {
             const days = daysUntil(batch.expiryDate);
-            return <View style={styles.alertRow} key={batch.id}>
-              <View style={[styles.alertDot, { backgroundColor: days <= 1 ? colors.light.destructive : '#d99045' }]} />
-              <View style={{ flex: 1 }}><Text style={styles.rowTitle}>{ingredientName(batch.ingredientId)}</Text><Text style={styles.rowMeta}>{batch.quantity.toFixed(1)} {ingredients.find((item) => item.id === batch.ingredientId)?.unit ?? ''} · {formatDate(batch.expiryDate)}</Text></View>
-              <Pill tone={days <= 1 ? 'danger' : 'warning'}>{days <= 0 ? 'Bugün' : `${days} gün`}</Pill>
-            </View>;
+            return <View style={styles.alertRow} key={batch.id}><View style={[styles.alertDot, { backgroundColor: days <= 1 ? colors.light.destructive : '#d99045' }]} /><View style={{ flex: 1 }}><Text style={styles.rowTitle}>{ingredientName(batch.ingredientId)}</Text><Text style={styles.rowMeta}>{batch.quantity.toFixed(1)} {ingredients.find((item) => item.id === batch.ingredientId)?.unit ?? ''} · {formatDate(batch.expiryDate)}</Text></View><Pill tone={days <= 1 ? 'danger' : 'warning'}>{days <= 0 ? 'Bugün' : `${days} gün`}</Pill></View>;
           })}
         </View>
       )}
-
       <SectionHeading title="Hızlı satış" action="Tümünü gör" onAction={() => onNavigate('sales')} />
       <View style={styles.cardList}>
         {recipes.slice().sort((a, b) => {
@@ -179,10 +171,7 @@ function Sales({ onNavigate }: { onNavigate: (section: Section) => void }) {
   const getAvailable = (recipeId: string) => {
     const recipe = recipes.find((item) => item.id === recipeId);
     if (!recipe) return true;
-    return recipe.ingredients.every((line) => {
-      const available = stockFor(batches, line.ingredientId);
-      return available >= line.quantity;
-    });
+    return recipe.ingredients.every((line) => stockFor(batches, line.ingredientId) >= line.quantity);
   };
   const submit = (recipeId: string) => {
     const quantity = Math.max(1, Math.floor(numberValue(quantities[recipeId] ?? '1')));
@@ -191,7 +180,6 @@ function Sales({ onNavigate }: { onNavigate: (section: Section) => void }) {
     if (success) setQuantities((previous) => ({ ...previous, [recipeId]: '' }));
     setTimeout(() => setMessage(null), 2600);
   };
-
   return (
     <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
       <View style={styles.topBar}><View><Text style={styles.eyebrow}>HIZLI İŞLEM</Text><Text style={styles.pageTitle}>Satış gir</Text></View><View style={styles.iconCircle}><Icon name="shopping-bag" size={20} color={colors.light.primary} /></View></View>
@@ -203,43 +191,48 @@ function Sales({ onNavigate }: { onNavigate: (section: Section) => void }) {
       {sorted.map((recipe, index) => {
         const sold = sales.filter((sale) => sale.recipeId === recipe.id).reduce((sum, sale) => sum + sale.quantity, 0);
         const available = getAvailable(recipe.id);
-        return <View style={styles.saleCard} key={recipe.id}>
-          <View style={styles.rank}><Text style={styles.rankText}>{String(index + 1).padStart(2, '0')}</Text></View>
-          <View style={{ flex: 1 }}><Text style={styles.saleName}>{recipe.name}</Text><Text style={styles.rowMeta}>{sold} satış · {money(recipe.salePrice)}</Text><View style={styles.saleIngredients}><Text style={styles.miniLabel}>{recipe.ingredients.map((line) => ingredients.find((item) => item.id === line.ingredientId)?.name).filter(Boolean).slice(0, 2).join(' · ')}</Text></View></View>
-          <View style={styles.saleControl}><TextInput testID={`input-sale-${recipe.id}`} keyboardType="decimal-pad" value={quantities[recipe.id] ?? ''} onChangeText={(value) => setQuantities((previous) => ({ ...previous, [recipe.id]: value }))} placeholder="1" placeholderTextColor={colors.light.mutedForeground} style={styles.quantityInput} /><Pressable testID={`button-sale-${recipe.id}`} disabled={!available} onPress={() => submit(recipe.id)} style={({ pressed }) => [styles.saleAdd, !available && styles.saleAddDisabled, pressed && styles.pressed]}><Icon name="plus" size={21} color={available ? colors.light.primaryForeground : colors.light.mutedForeground} /></Pressable></View>
-        </View>;
+        return <View style={styles.saleCard} key={recipe.id}><View style={styles.rank}><Text style={styles.rankText}>{String(index + 1).padStart(2, '0')}</Text></View><View style={{ flex: 1 }}><Text style={styles.saleName}>{recipe.name}</Text><Text style={styles.rowMeta}>{sold} satış · {money(recipe.salePrice)}</Text><View style={styles.saleIngredients}><Text style={styles.miniLabel}>{recipe.ingredients.map((line) => ingredients.find((item) => item.id === line.ingredientId)?.name).filter(Boolean).slice(0, 2).join(' · ')}</Text></View></View><View style={styles.saleControl}><TextInput testID={`input-sale-${recipe.id}`} keyboardType="decimal-pad" value={quantities[recipe.id] ?? ''} onChangeText={(value) => setQuantities((previous) => ({ ...previous, [recipe.id]: value }))} placeholder="1" placeholderTextColor={colors.light.mutedForeground} style={styles.quantityInput} /><Pressable testID={`button-sale-${recipe.id}`} disabled={!available} onPress={() => submit(recipe.id)} style={({ pressed }) => [styles.saleAdd, !available && styles.saleAddDisabled, pressed && styles.pressed]}><Icon name="plus" size={21} color={available ? colors.light.primaryForeground : colors.light.mutedForeground} /></Pressable></View></View>;
       })}
       <View style={styles.tipBox}><Icon name="info" size={18} color={colors.light.accentForeground} /><Text style={styles.tipText}>Satış girerken reçetedeki malzemeler, son kullanma tarihi en yakın partiden başlayarak otomatik düşer.</Text></View>
     </ScrollView>
   );
 }
 
-function Stock({ onOpen, onSelect }: { onOpen: (type: Exclude<ModalType, null>) => void; onSelect: (ingredientId: string) => void }) {
-  const { ingredients, batches } = useInventory();
+function Stock({ onOpen, onSelect }: { onOpen: (type: Exclude<ModalType, null>, mainCategory?: MainCategory) => void; onSelect: (ingredientId: string) => void }) {
+  const { ingredients, batches, subcategories } = useInventory();
   const [mainCategory, setMainCategory] = useState<'Tümü' | MainCategory>('Tümü');
   const [area, setArea] = useState<'Tümü' | Area>('Tümü');
+  const [selectedSubcategoryId, setSelectedSubcategoryId] = useState<string | null>(null);
   const [query, setQuery] = useState('');
+  const categorySubcategories = mainCategory === 'Tümü' ? [] : subcategories.filter((item) => item.mainCategory === mainCategory);
   const visible = ingredients.filter((ingredient) =>
     (mainCategory === 'Tümü' || ingredient.mainCategory === mainCategory) &&
+    (!selectedSubcategoryId || ingredient.subcategoryId === selectedSubcategoryId) &&
     (area === 'Tümü' || ingredient.area === area) &&
     `${ingredient.name} ${ingredient.content} ${ingredient.allergens.join(' ')}`.toLocaleLowerCase('tr').includes(query.toLocaleLowerCase('tr'))
   );
+  const changeMainCategory = (value: 'Tümü' | MainCategory) => {
+    setMainCategory(value);
+    setSelectedSubcategoryId(null);
+  };
   return (
     <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-      <View style={styles.topBar}><View><Text style={styles.eyebrow}>DEPO VE ÜRÜNLER</Text><Text style={styles.pageTitle}>Stok</Text></View><Pressable style={styles.iconCircle} onPress={() => onOpen('ingredient')}><Icon name="plus" size={21} color={colors.light.primary} /></Pressable></View>
+      <View style={styles.topBar}><View><Text style={styles.eyebrow}>DEPO VE ÜRÜNLER</Text><Text style={styles.pageTitle}>Stok</Text></View><Pressable style={styles.iconCircle} onPress={() => mainCategory !== 'Tümü' ? onOpen('subcategory', mainCategory) : onOpen('ingredient')}><Icon name="plus" size={21} color={colors.light.primary} /></Pressable></View>
       <View style={styles.searchBox}><Icon name="search" size={18} color={colors.light.mutedForeground} /><TextInput value={query} onChangeText={setQuery} placeholder="Ürün, içerik veya alerjen ara..." placeholderTextColor={colors.light.mutedForeground} style={styles.searchInput} /></View>
       <Text style={styles.filterLabel}>Ana kategori</Text>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>{['Tümü', ...MAIN_CATEGORIES].map((item) => <Pressable key={item} onPress={() => setMainCategory(item as 'Tümü' | MainCategory)} style={[styles.filterChip, mainCategory === item && styles.filterChipActive]}><Text style={[styles.filterChipText, mainCategory === item && styles.filterChipTextActive]}>{item}</Text></Pressable>)}</ScrollView>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>{['Tümü', ...MAIN_CATEGORIES].map((item) => <Pressable key={item} onPress={() => changeMainCategory(item as 'Tümü' | MainCategory)} style={[styles.filterChip, mainCategory === item && styles.filterChipActive]}><Text style={[styles.filterChipText, mainCategory === item && styles.filterChipTextActive]}>{item}</Text></Pressable>)}</ScrollView>
+      {mainCategory !== 'Tümü' ? <><Text style={styles.filterLabel}>Alt kategoriler <Text style={styles.filterHint}>· + ile yeni başlık ekle</Text></Text><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}><Pressable onPress={() => setSelectedSubcategoryId(null)} style={[styles.filterChip, !selectedSubcategoryId && styles.filterChipActive]}><Text style={[styles.filterChipText, !selectedSubcategoryId && styles.filterChipTextActive]}>Tümü</Text></Pressable>{categorySubcategories.map((item) => <Pressable key={item.id} onPress={() => setSelectedSubcategoryId(item.id)} style={[styles.filterChip, selectedSubcategoryId === item.id && styles.filterChipActive]}><Text style={[styles.filterChipText, selectedSubcategoryId === item.id && styles.filterChipTextActive]}>{item.name}</Text></Pressable>)}</ScrollView>{categorySubcategories.length === 0 ? <Text style={styles.subcategoryHint}>Bu kategoride henüz alt başlık yok. Sağ üstteki + ile ekleyebilirsin.</Text> : null}</> : null}
       <Text style={styles.filterLabel}>Alt kategori / alan</Text>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>{['Tümü', ...AREAS].map((item) => <Pressable key={item} onPress={() => setArea(item as 'Tümü' | Area)} style={[styles.filterChip, area === item && styles.filterChipActive]}><Text style={[styles.filterChipText, area === item && styles.filterChipTextActive]}>{item}</Text></Pressable>)}</ScrollView>
       <View style={styles.stockHeader}><Text style={styles.stockCount}>{visible.length} ürün</Text><PrimaryButton label="Sevkiyat" icon="package" onPress={() => onOpen('shipment')} secondary compact /></View>
-      {visible.length === 0 ? <EmptyState icon="search" title="Ürün bulunamadı" copy="Arama veya depo filtresini değiştir." /> : <View style={styles.cardList}>{visible.map((ingredient) => {
+      {visible.length === 0 ? <EmptyState icon="search" title="Ürün bulunamadı" copy="Arama, alt kategori veya depo filtresini değiştir." /> : <View style={styles.cardList}>{visible.map((ingredient) => {
         const stock = stockFor(batches, ingredient.id);
         const itemBatches = batches.filter((batch) => batch.ingredientId === ingredient.id && batch.quantity > 0).sort((a, b) => a.expiryDate.localeCompare(b.expiryDate));
         const nearest = itemBatches[0];
         const isLow = stock <= ingredient.threshold;
         const days = nearest ? daysUntil(nearest.expiryDate) : 999;
-        return <Pressable style={({ pressed }) => [styles.stockRow, pressed && styles.pressed]} onPress={() => onSelect(ingredient.id)} key={ingredient.id}><View style={styles.stockGlyph}><Icon name={ingredient.mainCategory === 'Bar' ? 'coffee' : ingredient.area === 'Kuru depo' ? 'box' : 'thermometer'} size={18} color={colors.light.primary} /></View><View style={{ flex: 1 }}><View style={styles.stockNameLine}><Text style={styles.rowTitle}>{ingredient.name}</Text>{isLow ? <Pill tone="warning">Eşik altı</Pill> : null}</View><Text style={styles.rowMeta}>{ingredient.mainCategory} · {ingredient.area} · eşik {ingredient.threshold} {ingredient.unit}</Text>{nearest ? <Text style={[styles.expiryText, days <= 3 && { color: colors.light.destructive }]}><Icon name="clock" size={12} color={days <= 3 ? colors.light.destructive : colors.light.mutedForeground} /> SKT {formatDate(nearest.expiryDate)} · {nearest.quantity.toFixed(1)} {ingredient.unit}</Text> : <Text style={styles.expiryText}>Stok partisi yok</Text>}</View><View style={styles.stockNumber}><Text style={[styles.stockValue, isLow && { color: colors.light.destructive }]}>{stock.toFixed(1)}</Text><Text style={styles.stockUnit}>{ingredient.unit}</Text></View></Pressable>;
+        const subcategoryName = ingredient.subcategoryId ? subcategories.find((item) => item.id === ingredient.subcategoryId)?.name : undefined;
+        return <Pressable style={({ pressed }) => [styles.stockRow, pressed && styles.pressed]} onPress={() => onSelect(ingredient.id)} key={ingredient.id}><View style={styles.stockGlyph}><Icon name={ingredient.mainCategory === 'Bar' ? 'coffee' : ingredient.area === 'Kuru depo' ? 'box' : 'thermometer'} size={18} color={colors.light.primary} /></View><View style={{ flex: 1 }}><View style={styles.stockNameLine}><Text style={styles.rowTitle}>{ingredient.name}</Text>{isLow ? <Pill tone="warning">Eşik altı</Pill> : null}</View><Text style={styles.rowMeta}>{ingredient.mainCategory}{subcategoryName ? ` · ${subcategoryName}` : ''} · {ingredient.area} · eşik {ingredient.threshold} {ingredient.unit}</Text>{nearest ? <Text style={[styles.expiryText, days <= 3 && { color: colors.light.destructive }]}><Icon name="clock" size={12} color={days <= 3 ? colors.light.destructive : colors.light.mutedForeground} /> SKT {formatDate(nearest.expiryDate)} · {nearest.quantity.toFixed(1)} {ingredient.unit}</Text> : <Text style={styles.expiryText}>Stok partisi yok</Text>}</View><View style={styles.stockNumber}><Text style={[styles.stockValue, isLow && { color: colors.light.destructive }]}>{stock.toFixed(1)}</Text><Text style={styles.stockUnit}>{ingredient.unit}</Text></View></Pressable>;
       })}</View>}
     </ScrollView>
   );
@@ -274,7 +267,6 @@ function Reports() {
     const revenue = categoryRecipes.reduce((sum, recipe) => sum + filteredSales.filter((sale) => sale.recipeId === recipe.id).reduce((inner, sale) => inner + sale.quantity, 0) * recipe.salePrice, 0);
     return { category, sold, revenue };
   });
-  const totalWaste = ingredientReports.reduce((sum, item) => sum + item.waste, 0);
   const totalLoss = ingredientReports.reduce((sum, item) => sum + item.loss, 0);
   const topWaste = ingredientReports.slice().sort((a, b) => b.ratio - a.ratio)[0];
   const topOpportunity = recipeReports.slice().sort((a, b) => b.margin - a.margin).find((item) => item.sold < Math.max(...recipeReports.map((candidate) => candidate.sold), 1) * 0.6);
@@ -288,11 +280,7 @@ function Reports() {
       <View style={styles.analysisModeRow}>{[['product', 'Ürün'], ['category', 'Kategori'], ['revenue', 'Ciro']].map(([key, label]) => <Pressable key={key} onPress={() => setMode(key as 'product' | 'category' | 'revenue')} style={[styles.analysisMode, mode === key && styles.analysisModeActive]}><Text style={[styles.analysisModeText, mode === key && styles.analysisModeTextActive]}>{label}</Text></Pressable>)}</View>
       <View style={styles.reportSummary}><View><Text style={styles.metricLabel}>DÖNEM CİROSU</Text><Text style={styles.reportValue}>{money(periodRevenue)}</Text></View><View style={styles.summaryDivider} /><View><Text style={styles.metricLabel}>SKT ZARARI</Text><Text style={[styles.reportValue, { color: '#ffd0c4' }]}>{money(totalLoss)}</Text></View></View>
       <SectionHeading title="Öneriler" />
-      <View style={styles.recommendations}>
-        {topWaste && topWaste.waste > 0 ? <View style={styles.recommendation}><View style={[styles.recommendationIcon, { backgroundColor: '#f6ddd7' }]}><Icon name="alert-triangle" size={19} color={colors.light.destructive} /></View><View style={{ flex: 1 }}><Text style={styles.recommendationTitle}>Sipariş miktarını azalt</Text><Text style={styles.recommendationCopy}>{topWaste.ingredient.name} için fire oranı yüksek görünüyor.</Text><Text style={styles.recommendationStats}>Tüketim {topWaste.consumed.toFixed(1)} · Fire {topWaste.waste.toFixed(1)} · Zarar {money(topWaste.loss)}</Text></View></View> : null}
-        {topOpportunity ? <View style={styles.recommendation}><View style={[styles.recommendationIcon, { backgroundColor: '#dcebe0' }]}><Icon name="trending-up" size={19} color={colors.light.primary} /></View><View style={{ flex: 1 }}><Text style={styles.recommendationTitle}>Bu ürünü öne çıkar</Text><Text style={styles.recommendationCopy}>{topOpportunity.recipe.name}, yüksek marja rağmen daha az satılıyor.</Text><Text style={styles.recommendationStats}>Satış {topOpportunity.sold} · Marj {money(topOpportunity.margin)} · Oran %{Math.round(topOpportunity.marginRatio * 100)}</Text></View></View> : null}
-        {!topWaste?.waste && !topOpportunity ? <EmptyState icon="check-circle" title="Henüz öneri yok" copy="Daha fazla satış ve SKT kaydı oluştukça burada aksiyon önerileri görünecek." /> : null}
-      </View>
+      <View style={styles.recommendations}>{topWaste && topWaste.waste > 0 ? <View style={styles.recommendation}><View style={[styles.recommendationIcon, { backgroundColor: '#f6ddd7' }]}><Icon name="alert-triangle" size={19} color={colors.light.destructive} /></View><View style={{ flex: 1 }}><Text style={styles.recommendationTitle}>Sipariş miktarını azalt</Text><Text style={styles.recommendationCopy}>{topWaste.ingredient.name} için fire oranı yüksek görünüyor.</Text><Text style={styles.recommendationStats}>Tüketim {topWaste.consumed.toFixed(1)} · Fire {topWaste.waste.toFixed(1)} · Zarar {money(topWaste.loss)}</Text></View></View> : null}{topOpportunity ? <View style={styles.recommendation}><View style={[styles.recommendationIcon, { backgroundColor: '#dcebe0' }]}><Icon name="trending-up" size={19} color={colors.light.primary} /></View><View style={{ flex: 1 }}><Text style={styles.recommendationTitle}>Bu ürünü öne çıkar</Text><Text style={styles.recommendationCopy}>{topOpportunity.recipe.name}, yüksek marja rağmen daha az satılıyor.</Text><Text style={styles.recommendationStats}>Satış {topOpportunity.sold} · Marj {money(topOpportunity.margin)} · Oran %{Math.round(topOpportunity.marginRatio * 100)}</Text></View></View> : null}{!topWaste?.waste && !topOpportunity ? <EmptyState icon="check-circle" title="Henüz öneri yok" copy="Daha fazla satış ve SKT kaydı oluştukça burada aksiyon önerileri görünecek." /> : null}</View>
       <SectionHeading title={mode === 'category' ? 'Kategori performansı' : mode === 'revenue' ? 'Ciro performansı' : 'Ürün performansı'} />
       {mode === 'product' ? <View style={styles.cardList}>{ingredientReports.map((row) => <View style={styles.reportRow} key={row.ingredient.id}><View style={styles.reportName}><Text style={styles.rowTitle}>{row.ingredient.name}</Text><Text style={styles.rowMeta}>{row.ingredient.mainCategory} · {row.ingredient.unit}</Text></View><View style={styles.reportMetric}><Text style={styles.reportMetricValue}>{row.consumed.toFixed(1)}</Text><Text style={styles.reportMetricLabel}>satış etkisi</Text></View><View style={styles.reportMetric}><Text style={[styles.reportMetricValue, row.waste > 0 && { color: colors.light.destructive }]}>{row.waste.toFixed(1)}</Text><Text style={styles.reportMetricLabel}>fire</Text></View><View style={styles.reportMetric}><Text style={styles.reportMetricValue}>{money(row.loss)}</Text><Text style={styles.reportMetricLabel}>zarar</Text></View></View>)}</View> : mode === 'category' ? <View style={styles.cardList}>{categoryReports.map((row) => <View style={styles.reportRow} key={row.category}><View style={styles.reportName}><Text style={styles.rowTitle}>{row.category}</Text><Text style={styles.rowMeta}>Kategori toplamı</Text></View><View style={styles.reportMetric}><Text style={styles.reportMetricValue}>{row.sold}</Text><Text style={styles.reportMetricLabel}>satış</Text></View><View style={styles.reportMetric}><Text style={styles.reportMetricValue}>{money(row.revenue)}</Text><Text style={styles.reportMetricLabel}>ciro</Text></View></View>)}</View> : <View style={styles.cardList}>{recipeReports.slice().sort((a, b) => b.revenue - a.revenue).map((row) => <View style={styles.reportRow} key={row.recipe.id}><View style={styles.reportName}><Text style={styles.rowTitle}>{row.recipe.name}</Text><Text style={styles.rowMeta}>{row.sold} satış · marj {money(row.margin)}</Text></View><View style={styles.revenueBar}><View style={[styles.revenueBarFill, { width: `${Math.min(100, periodRevenue ? (row.revenue / periodRevenue) * 100 : 0)}%` }]} /><Text style={styles.revenueValue}>{money(row.revenue)}</Text></View></View>)}</View>}
     </ScrollView>
@@ -330,22 +318,17 @@ function SelectRow({ label, options, value, onChange }: { label: string; options
 function BarcodeScannerModal({ visible, onClose, onScanned }: { visible: boolean; onClose: () => void; onScanned: (value: string) => void }) {
   const [permission, requestPermission] = useCameraPermissions();
   const [manualCode, setManualCode] = useState('');
-  const submitManual = () => {
-    if (manualCode.trim()) {
-      onScanned(manualCode.trim());
-      setManualCode('');
-      onClose();
-    }
-  };
+  const submitManual = () => { if (manualCode.trim()) { onScanned(manualCode.trim()); setManualCode(''); onClose(); } };
   return <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}><View style={styles.modalBackdrop}><View style={styles.scannerCard}><View style={styles.modalHeader}><Text style={styles.modalTitle}>Barkod tara</Text><Pressable onPress={onClose} style={styles.closeButton}><Icon name="x" size={20} color={colors.light.foreground} /></Pressable></View>{Platform.OS === 'web' ? <View style={styles.scannerFallback}><View style={styles.scannerFallbackIcon}><Icon name="camera" size={26} color={colors.light.primary} /></View><Text style={styles.emptyTitle}>Mobil uygulamada kamera</Text><Text style={styles.emptyCopy}>Web önizlemesinde barkodu elle yazabilirsin. Telefonda açıldığında kamera taraması aktif olur.</Text><Field label="Barkod numarası" value={manualCode} onChangeText={setManualCode} placeholder="EAN / UPC" /><PrimaryButton label="Barkodu kullan" icon="check" onPress={submitManual} /></View> : !permission ? <View style={styles.scannerFallback}><ActivityIndicator color={colors.light.primary} /></View> : !permission.granted ? <View style={styles.scannerFallback}><View style={styles.scannerFallbackIcon}><Icon name="camera-off" size={26} color={colors.light.destructive} /></View><Text style={styles.emptyTitle}>Kamera izni gerekli</Text><Text style={styles.emptyCopy}>Ürün barkodunu okuyabilmek için kamera erişimine izin ver.</Text><PrimaryButton label="Kamera izni ver" icon="camera" onPress={() => requestPermission()} /></View> : <View style={styles.cameraFrame}><CameraView style={StyleSheet.absoluteFill} barcodeScannerSettings={{ barcodeTypes: ['ean13', 'ean8', 'upc_a', 'upc_e', 'code128', 'code39', 'qr'] }} onBarcodeScanned={({ data }) => { onScanned(data); onClose(); }} /><View style={styles.scanGuide}><View style={styles.scanCorner} /><Text style={styles.scanHint}>Barkodu çerçevenin içine hizala</Text></View></View>}</View></View></Modal>;
 }
 
 function IngredientDetailModal({ ingredientId, onClose }: { ingredientId: string; onClose: () => void }) {
-  const { ingredients, batches } = useInventory();
+  const { ingredients, batches, subcategories } = useInventory();
   const ingredient = ingredients.find((item) => item.id === ingredientId);
   if (!ingredient) return null;
   const stock = stockFor(batches, ingredient.id);
-  return <Modal visible transparent animationType="slide" onRequestClose={onClose}><View style={styles.modalBackdrop}><View style={styles.modalCard}><View style={styles.modalHeader}><View><Text style={styles.eyebrow}>{ingredient.mainCategory.toUpperCase()} · {ingredient.area.toUpperCase()}</Text><Text style={styles.modalTitle}>{ingredient.name}</Text></View><Pressable onPress={onClose} style={styles.closeButton}><Icon name="x" size={20} color={colors.light.foreground} /></Pressable></View><ScrollView contentContainerStyle={styles.modalContent}><View style={styles.detailHero}><View style={styles.detailHeroIcon}><Icon name={ingredient.mainCategory === 'Bar' ? 'coffee' : 'package'} size={25} color={colors.light.primary} /></View><View><Text style={styles.detailStock}>{stock.toFixed(1)} {ingredient.unit}</Text><Text style={styles.rowMeta}>Mevcut stok · eşik {ingredient.threshold} {ingredient.unit}</Text></View></View><View style={styles.detailGrid}><View style={styles.detailTile}><Text style={styles.metricLabel}>KALORİ</Text><Text style={styles.detailValue}>{ingredient.calories || '—'}</Text><Text style={styles.rowMeta}>kcal / 100 g</Text></View><View style={styles.detailTile}><Text style={styles.metricLabel}>ALIŞ</Text><Text style={styles.detailValue}>{money(ingredient.buyPrice)}</Text><Text style={styles.rowMeta}>birim fiyat</Text></View></View><Text style={styles.formSectionLabel}>İçindekiler</Text><Text style={styles.detailCopy}>{ingredient.content || 'İçerik bilgisi henüz eklenmedi.'}</Text><Text style={styles.formSectionLabel}>Alerjenler</Text><View style={styles.allergenRow}>{ingredient.allergens.length ? ingredient.allergens.map((allergen) => <Pill tone="danger" key={allergen}>{allergen}</Pill>) : <Pill tone="success">Alerjen yok</Pill>}</View>{ingredient.barcode ? <Text style={styles.detailBarcode}>Barkod: {ingredient.barcode}</Text> : null}</ScrollView></View></View></Modal>;
+  const subcategory = ingredient.subcategoryId ? subcategories.find((item) => item.id === ingredient.subcategoryId) : undefined;
+  return <Modal visible transparent animationType="slide" onRequestClose={onClose}><View style={styles.modalBackdrop}><View style={styles.modalCard}><View style={styles.modalHeader}><View><Text style={styles.eyebrow}>{ingredient.mainCategory.toUpperCase()} {subcategory ? `· ${subcategory.name.toUpperCase()}` : ''}</Text><Text style={styles.modalTitle}>{ingredient.name}</Text></View><Pressable onPress={onClose} style={styles.closeButton}><Icon name="x" size={20} color={colors.light.foreground} /></Pressable></View><ScrollView contentContainerStyle={styles.modalContent}><View style={styles.detailHero}><View style={styles.detailHeroIcon}><Icon name={ingredient.mainCategory === 'Bar' ? 'coffee' : 'package'} size={25} color={colors.light.primary} /></View><View><Text style={styles.detailStock}>{stock.toFixed(1)} {ingredient.unit}</Text><Text style={styles.rowMeta}>Mevcut stok · eşik {ingredient.threshold} {ingredient.unit}</Text></View></View><View style={styles.detailGrid}><View style={styles.detailTile}><Text style={styles.metricLabel}>KALORİ</Text><Text style={styles.detailValue}>{ingredient.calories || '—'}</Text><Text style={styles.rowMeta}>kcal / 100 g</Text></View><View style={styles.detailTile}><Text style={styles.metricLabel}>ALIŞ</Text><Text style={styles.detailValue}>{money(ingredient.buyPrice)}</Text><Text style={styles.rowMeta}>birim fiyat</Text></View></View><Text style={styles.formSectionLabel}>İçindekiler</Text><Text style={styles.detailCopy}>{ingredient.content || 'İçerik bilgisi henüz eklenmedi.'}</Text><Text style={styles.formSectionLabel}>Alerjenler</Text><View style={styles.allergenRow}>{ingredient.allergens.length ? ingredient.allergens.map((allergen) => <Pill tone="danger" key={allergen}>{allergen}</Pill>) : <Pill tone="success">Alerjen yok</Pill>}</View>{ingredient.barcode ? <Text style={styles.detailBarcode}>Barkod: {ingredient.barcode}</Text> : null}</ScrollView></View></View></Modal>;
 }
 
 const WEEK_DAYS = [{ value: 2, label: 'Pzt' }, { value: 3, label: 'Sal' }, { value: 4, label: 'Çar' }, { value: 5, label: 'Per' }, { value: 6, label: 'Cum' }, { value: 7, label: 'Cmt' }, { value: 1, label: 'Paz' }];
@@ -383,39 +366,30 @@ function OrderListModal({ onClose }: { onClose: () => void }) {
   const { ingredients, batches, recipes, sales, schedules } = useInventory();
   const [period, setPeriod] = useState<PeriodKey>('3m');
   const selectedPeriod = PERIODS.find((item) => item.key === period) ?? PERIODS[3];
-  const cutoff = new Date();
-  cutoff.setDate(cutoff.getDate() - selectedPeriod.days);
+  const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - selectedPeriod.days);
   const cutoffKey = cutoff.toISOString().slice(0, 10);
   const periodSales = sales.filter((sale) => sale.date >= cutoffKey);
   const rows = ingredients.map((ingredient) => {
-    const usage = periodSales.reduce((sum, sale) => {
-      const recipe = recipes.find((item) => item.id === sale.recipeId);
-      const line = recipe?.ingredients.find((item) => item.ingredientId === ingredient.id);
-      return sum + (line?.quantity ?? 0) * sale.quantity;
-    }, 0);
-    const weekendUsage = periodSales.filter((sale) => [0, 6].includes(new Date(`${sale.date}T12:00:00`).getDay())).reduce((sum, sale) => {
-      const recipe = recipes.find((item) => item.id === sale.recipeId);
-      const line = recipe?.ingredients.find((item) => item.ingredientId === ingredient.id);
-      return sum + (line?.quantity ?? 0) * sale.quantity;
-    }, 0);
+    const usage = periodSales.reduce((sum, sale) => { const recipe = recipes.find((item) => item.id === sale.recipeId); const line = recipe?.ingredients.find((item) => item.ingredientId === ingredient.id); return sum + (line?.quantity ?? 0) * sale.quantity; }, 0);
+    const weekendUsage = periodSales.filter((sale) => [0, 6].includes(new Date(`${sale.date}T12:00:00`).getDay())).reduce((sum, sale) => { const recipe = recipes.find((item) => item.id === sale.recipeId); const line = recipe?.ingredients.find((item) => item.ingredientId === ingredient.id); return sum + (line?.quantity ?? 0) * sale.quantity; }, 0);
     const dailyAverage = usage / Math.max(selectedPeriod.days, 1);
     const coverageDays = Math.max(2, Math.ceil(7 / Math.max(schedules.orderDays.length, 1)));
     const stock = stockFor(batches, ingredient.id);
     const target = Math.max(ingredient.threshold, dailyAverage * coverageDays);
     return { ingredient, usage, weekendUsage, stock, suggestion: Math.max(0, Math.ceil(target - stock)), coverageDays };
   }).filter((row) => row.suggestion > 0 || row.stock <= row.ingredient.threshold).sort((a, b) => b.suggestion - a.suggestion);
-
   return <Modal visible transparent animationType="slide" onRequestClose={onClose}><View style={styles.modalBackdrop}><View style={styles.modalCard}><View style={styles.modalHeader}><View><Text style={styles.eyebrow}>GEÇMİŞ SATIŞ ANALİZİ</Text><Text style={styles.modalTitle}>Sipariş listen hazır</Text></View><Pressable onPress={onClose} style={styles.closeButton}><Icon name="x" size={20} color={colors.light.foreground} /></Pressable></View><ScrollView contentContainerStyle={styles.modalContent}><Text style={styles.scheduleIntro}>Son satışları ve mevcut sayımı karşılaştırarak bir sonraki sipariş gününe kadar yetecek örnek miktarı hesapladım. Hafta sonu tüketimi ayrı gösterilir.</Text><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>{PERIODS.slice(2).map((item) => <Pressable key={item.key} onPress={() => setPeriod(item.key)} style={[styles.filterChip, period === item.key && styles.filterChipActive]}><Text style={[styles.filterChipText, period === item.key && styles.filterChipTextActive]}>{item.label}</Text></Pressable>)}</ScrollView>{rows.length === 0 ? <EmptyState icon="check-circle" title="Sipariş gerekmiyor" copy="Mevcut stokların eşik üstünde görünüyor." /> : <View style={styles.cardList}>{rows.map((row) => <View style={styles.orderRow} key={row.ingredient.id}><View style={styles.stockGlyph}><Icon name="shopping-cart" size={17} color={colors.light.primary} /></View><View style={{ flex: 1 }}><Text style={styles.rowTitle}>{row.ingredient.name}</Text><Text style={styles.rowMeta}>Mevcut {row.stock.toFixed(1)} {row.ingredient.unit} · son {selectedPeriod.days} günde {row.usage.toFixed(1)} tüketim</Text><Text style={styles.orderMeta}>Hafta sonu: {row.weekendUsage.toFixed(1)} · Sipariş aralığı: {row.coverageDays} gün</Text></View><View style={styles.orderAmount}><Text style={styles.orderAmountValue}>{row.suggestion}</Text><Text style={styles.stockUnit}>{row.ingredient.unit} al</Text></View></View>)}</View>}<View style={styles.notificationNote}><Icon name="calendar" size={17} color={colors.light.primary} /><Text style={styles.localNoteText}>Sipariş günlerin: {schedules.orderDays.length} gün/hafta. Resmî tatil ve özel gün satışlarını ayrıca kaydettiğinde öneri geçmiş veriye göre güncellenir.</Text></View></ScrollView></View></View></Modal>;
 }
 
-function FormModal({ type, onClose }: { type: FormModalType; onClose: () => void }) {
-  const { ingredients, addIngredient, addShipment, addRecipe, addReturn } = useInventory();
+function FormModal({ type, onClose, initialMainCategory = 'Mutfak' }: { type: FormModalType; onClose: () => void; initialMainCategory?: MainCategory }) {
+  const { ingredients, subcategories, addIngredient, addShipment, addRecipe, addReturn, addSubcategory } = useInventory();
   const [name, setName] = useState('');
   const [unit, setUnit] = useState('kg');
   const [buyPrice, setBuyPrice] = useState('');
   const [salePrice, setSalePrice] = useState('');
   const [area, setArea] = useState<Area>('Soğuk depo');
-  const [mainCategory, setMainCategory] = useState<MainCategory>('Mutfak');
+  const [mainCategory, setMainCategory] = useState<MainCategory>(initialMainCategory);
+  const [subcategoryId, setSubcategoryId] = useState('');
   const [threshold, setThreshold] = useState('');
   const [content, setContent] = useState('');
   const [calories, setCalories] = useState('');
@@ -429,12 +403,15 @@ function FormModal({ type, onClose }: { type: FormModalType; onClose: () => void
   const [recipeLines, setRecipeLines] = useState<Record<string, string>>({});
   const [photoUri, setPhotoUri] = useState<string | undefined>();
   const [scannerVisible, setScannerVisible] = useState(false);
-
-  const titles: Record<FormModalType, string> = { ingredient: 'Yeni ürün kartı', shipment: 'Sevkiyat girişi', recipe: 'Yeni reçete', return: 'İade kaydı' };
+  const availableSubcategories = subcategories.filter((item) => item.mainCategory === mainCategory);
+  const titles: Record<FormModalType, string> = { ingredient: 'Yeni ürün kartı', shipment: 'Sevkiyat girişi', recipe: 'Yeni reçete', return: 'İade kaydı', subcategory: 'Yeni alt kategori' };
   const submit = () => {
-    if (type === 'ingredient') {
+    if (type === 'subcategory') {
+      if (!name.trim()) return Alert.alert('Eksik bilgi', 'Başlık adını yazmalısın.');
+      addSubcategory({ name: name.trim(), mainCategory });
+    } else if (type === 'ingredient') {
       if (!name.trim()) return Alert.alert('Eksik bilgi', 'Ürün adını yazmalısın.');
-      addIngredient({ name: name.trim(), unit: unit.trim() || 'adet', buyPrice: numberValue(buyPrice), salePrice: numberValue(salePrice), area, mainCategory, threshold: numberValue(threshold), content: content.trim(), calories: numberValue(calories), allergens: allergens.split(',').map((item) => item.trim()).filter(Boolean), barcode: barcode.trim() || undefined });
+      addIngredient({ name: name.trim(), unit: unit.trim() || 'adet', buyPrice: numberValue(buyPrice), salePrice: numberValue(salePrice), area, mainCategory, subcategoryId: subcategoryId || undefined, threshold: numberValue(threshold), content: content.trim(), calories: numberValue(calories), allergens: allergens.split(',').map((item) => item.trim()).filter(Boolean), barcode: barcode.trim() || undefined });
     } else if (type === 'shipment') {
       if (!ingredientId || numberValue(quantity) <= 0) return Alert.alert('Eksik bilgi', 'Ürün ve miktar seçmelisin.');
       addShipment({ ingredientId, quantity: numberValue(quantity), expiryDate, area, imageUri: photoUri });
@@ -449,20 +426,11 @@ function FormModal({ type, onClose }: { type: FormModalType; onClose: () => void
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);
     onClose();
   };
-
-  const pickShipmentImage = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.75 });
-    if (!result.canceled) setPhotoUri(result.assets[0]?.uri);
-  };
-  const selectBarcode = (value: string) => {
-    setBarcode(value);
-    const match = ingredients.find((item) => item.barcode === value);
-    if (match) setIngredientId(match.id);
-    else Alert.alert('Barkod kaydedildi', 'Bu barkod henüz bir ürün kartıyla eşleşmiyor. Ürün kartına barkodu ekleyebilirsin.');
-  };
-
+  const pickShipmentImage = async () => { const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.75 }); if (!result.canceled) setPhotoUri(result.assets[0]?.uri); };
+  const selectBarcode = (value: string) => { setBarcode(value); const match = ingredients.find((item) => item.barcode === value); if (match) setIngredientId(match.id); else Alert.alert('Barkod kaydedildi', 'Bu barkod henüz bir ürün kartıyla eşleşmiyor. Ürün kartına barkodu ekleyebilirsin.'); };
   return <><Modal visible transparent animationType="slide" onRequestClose={onClose}><View style={styles.modalBackdrop}><View style={styles.modalCard}><View style={styles.modalHeader}><Text style={styles.modalTitle}>{titles[type]}</Text><Pressable onPress={onClose} style={styles.closeButton}><Icon name="x" size={20} color={colors.light.foreground} /></Pressable></View><ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.modalContent}>
-    {type === 'ingredient' ? <><Field label="Ürün adı" value={name} onChangeText={setName} placeholder="Örn. Taze nane" /><View style={styles.fieldPair}><View style={{ flex: 1 }}><Field label="Birim" value={unit} onChangeText={setUnit} placeholder="kg, L, adet" /></View><View style={{ flex: 1 }}><Field label="Min. eşik" value={threshold} onChangeText={setThreshold} placeholder="5" keyboardType="decimal-pad" /></View></View><View style={styles.fieldPair}><View style={{ flex: 1 }}><Field label="Alış fiyatı" value={buyPrice} onChangeText={setBuyPrice} placeholder="0 ₺" keyboardType="decimal-pad" /></View><View style={{ flex: 1 }}><Field label="Satış fiyatı" value={salePrice} onChangeText={setSalePrice} placeholder="0 ₺" keyboardType="decimal-pad" /></View></View><SelectRow label="Ana kategori" options={MAIN_CATEGORIES} value={mainCategory} onChange={(value) => setMainCategory(value as MainCategory)} /><SelectRow label="Alt kategori / alan" options={AREAS} value={area} onChange={(value) => setArea(value as Area)} /><Field label="İçerik" value={content} onChangeText={setContent} placeholder="Örn. süt, peynir kültürü, tuz" /><View style={styles.fieldPair}><View style={{ flex: 1 }}><Field label="Kalori / 100 g" value={calories} onChangeText={setCalories} placeholder="0" keyboardType="decimal-pad" /></View><View style={{ flex: 1 }}><Field label="Alerjenler" value={allergens} onChangeText={setAllergens} placeholder="Süt, gluten" /></View></View><Field label="Barkod (opsiyonel)" value={barcode} onChangeText={setBarcode} placeholder="EAN / UPC" /></> : null}
+    {type === 'subcategory' ? <><Field label="Başlık adı" value={name} onChangeText={setName} placeholder="Örn. Soğuk içecekler" /><SelectRow label="Ana kategori" options={MAIN_CATEGORIES} value={mainCategory} onChange={(value) => setMainCategory(value as MainCategory)} /><View style={styles.notificationNote}><Icon name="layers" size={17} color={colors.light.primary} /><Text style={styles.localNoteText}>Bu başlık yalnızca seçtiğin ana kategorinin içinde görünecek. Örneğin Bar → Soğuk içecekler.</Text></View></> : null}
+    {type === 'ingredient' ? <><Field label="Ürün adı" value={name} onChangeText={setName} placeholder="Örn. Coca-Cola" /><View style={styles.fieldPair}><View style={{ flex: 1 }}><Field label="Birim" value={unit} onChangeText={setUnit} placeholder="kg, L, adet" /></View><View style={{ flex: 1 }}><Field label="Min. eşik" value={threshold} onChangeText={setThreshold} placeholder="5" keyboardType="decimal-pad" /></View></View><View style={styles.fieldPair}><View style={{ flex: 1 }}><Field label="Alış fiyatı" value={buyPrice} onChangeText={setBuyPrice} placeholder="0 ₺" keyboardType="decimal-pad" /></View><View style={{ flex: 1 }}><Field label="Satış fiyatı" value={salePrice} onChangeText={setSalePrice} placeholder="0 ₺" keyboardType="decimal-pad" /></View></View><SelectRow label="Ana kategori" options={MAIN_CATEGORIES} value={mainCategory} onChange={(value) => { setMainCategory(value as MainCategory); setSubcategoryId(''); }} />{availableSubcategories.length ? <SelectRow label="Alt kategori" options={availableSubcategories.map((item) => item.name)} value={availableSubcategories.find((item) => item.id === subcategoryId)?.name ?? ''} onChange={(value) => setSubcategoryId(availableSubcategories.find((item) => item.name === value)?.id ?? '')} /> : <Text style={styles.subcategoryHint}>Bu ana kategoride henüz alt kategori yok. Önce stok ekranından + ile bir başlık oluşturabilirsin.</Text>}<SelectRow label="Alt kategori / alan" options={AREAS} value={area} onChange={(value) => setArea(value as Area)} /><Field label="İçerik" value={content} onChangeText={setContent} placeholder="Örn. süt, peynir kültürü, tuz" /><View style={styles.fieldPair}><View style={{ flex: 1 }}><Field label="Kalori / 100 g" value={calories} onChangeText={setCalories} placeholder="0" keyboardType="decimal-pad" /></View><View style={{ flex: 1 }}><Field label="Alerjenler" value={allergens} onChangeText={setAllergens} placeholder="Süt, gluten" /></View></View><Field label="Barkod (opsiyonel)" value={barcode} onChangeText={setBarcode} placeholder="EAN / UPC" /></> : null}
     {type === 'shipment' ? <><View style={styles.field}><Text style={styles.fieldLabel}>Ürün</Text><View style={styles.searchBox}><Icon name="search" size={18} color={colors.light.mutedForeground} /><TextInput value={shipmentProductQuery} onChangeText={setShipmentProductQuery} placeholder="Ürün ara..." placeholderTextColor={colors.light.mutedForeground} style={styles.searchInput} /></View><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.selectRow}>{ingredients.filter((item) => item.name.toLocaleLowerCase('tr').includes(shipmentProductQuery.toLocaleLowerCase('tr'))).map((item) => <Pressable key={item.id} onPress={() => setIngredientId(item.id)} style={[styles.selectOption, ingredientId === item.id && styles.selectOptionActive]}><Text style={[styles.selectOptionText, ingredientId === item.id && styles.selectOptionTextActive]}>{item.name}</Text></Pressable>)}</ScrollView>{ingredients.filter((item) => item.name.toLocaleLowerCase('tr').includes(shipmentProductQuery.toLocaleLowerCase('tr'))).length === 0 ? <Text style={styles.rowMeta}>Ürün bulunamadı.</Text> : null}</View><View style={styles.scannerActions}><PrimaryButton label="Barkod tara" icon="camera" onPress={() => setScannerVisible(true)} secondary compact /><PrimaryButton label="Görsel ekle" icon="image" onPress={pickShipmentImage} secondary compact /></View>{photoUri ? <View style={styles.photoAttached}><Icon name="check-circle" size={16} color={colors.light.primary} /><Text style={styles.rowMeta}>Sevkiyat görseli eklendi</Text></View> : null}<Field label="Miktar" value={quantity} onChangeText={setQuantity} placeholder="0" keyboardType="decimal-pad" /><Field label="Son kullanma tarihi" value={expiryDate} onChangeText={setExpiryDate} placeholder="YYYY-AA-GG" /><SelectRow label="Depo alanı" options={AREAS} value={area} onChange={(value) => setArea(value as Area)} /></> : null}
     {type === 'return' ? <><SelectRow label="Ürün" options={ingredients.map((item) => item.name)} value={ingredients.find((item) => item.id === ingredientId)?.name ?? ''} onChange={(value) => setIngredientId(ingredients.find((item) => item.name === value)?.id ?? '')} /><Field label="Miktar" value={quantity} onChangeText={setQuantity} placeholder="0" keyboardType="decimal-pad" /><Field label="İade tarihi" value={expiryDate} onChangeText={setExpiryDate} placeholder="YYYY-AA-GG" /><Field label="Sebep" value={reason} onChangeText={setReason} placeholder="Örn. ambalaj hasarı" /></> : null}
     {type === 'recipe' ? <><Field label="Menü ürünü adı" value={name} onChangeText={setName} placeholder="Örn. Mantarlı pizza" /><Field label="Satış fiyatı" value={salePrice} onChangeText={setSalePrice} placeholder="0 ₺" keyboardType="decimal-pad" /><Text style={styles.formSectionLabel}>Porsiyon başına malzeme</Text>{ingredients.map((item) => <View style={styles.recipeInputRow} key={item.id}><View style={{ flex: 1 }}><Text style={styles.rowTitle}>{item.name}</Text><Text style={styles.rowMeta}>{item.unit}</Text></View><TextInput value={recipeLines[item.id] ?? ''} onChangeText={(value) => setRecipeLines((previous) => ({ ...previous, [item.id]: value }))} placeholder="0" placeholderTextColor={colors.light.mutedForeground} keyboardType="decimal-pad" style={styles.recipeInput} /></View>)}</> : null}
@@ -476,17 +444,12 @@ export default function HomeScreen() {
   const [section, setSection] = useState<Section>('summary');
   const [modal, setModal] = useState<ModalType>(null);
   const [selectedIngredient, setSelectedIngredient] = useState<string | null>(null);
+  const [subcategoryMainCategory, setSubcategoryMainCategory] = useState<MainCategory>('Bar');
   useEffect(() => {
-    if (Platform.OS === 'web' && process.env.NODE_ENV === 'production' && 'serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/sw.js').catch(() => undefined);
-    }
-    if (Platform.OS !== 'web') {
-      Notifications.setNotificationHandler({
-        handleNotification: async () => ({ shouldShowAlert: true, shouldShowBanner: true, shouldShowList: true, shouldPlaySound: false, shouldSetBadge: false }),
-      });
-    }
+    if (Platform.OS === 'web' && process.env.NODE_ENV === 'production' && 'serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => undefined);
+    if (Platform.OS !== 'web') Notifications.setNotificationHandler({ handleNotification: async () => ({ shouldShowAlert: true, shouldShowBanner: true, shouldShowList: true, shouldPlaySound: false, shouldSetBadge: false }) });
   }, []);
-  const openModal = (type: Exclude<ModalType, null>) => setModal(type);
+  const openModal = (type: Exclude<ModalType, null>, mainCategory?: MainCategory) => { if (type === 'subcategory' && mainCategory) setSubcategoryMainCategory(mainCategory); setModal(type); };
   const content = useMemo(() => {
     if (section === 'summary') return <Dashboard onNavigate={setSection} onOpen={openModal} />;
     if (section === 'sales') return <Sales onNavigate={setSection} />;
@@ -502,7 +465,7 @@ export default function HomeScreen() {
     { key: 'more', label: 'Daha', icon: 'more-horizontal' },
   ];
   if (!hydrated) return <View style={styles.loading}><ActivityIndicator color={colors.light.primary} /><Text style={styles.loadingText}>Mutfak hazırlanıyor...</Text></View>;
-  return <View style={[styles.app, { paddingTop: Platform.OS === 'web' ? 0 : 0 }]}><View style={{ flex: 1 }}>{content}</View><View style={[styles.bottomNav, { paddingBottom: Platform.OS === 'web' ? 34 : Math.max(insets.bottom, 8), height: Platform.OS === 'web' ? 84 : 72 }]}>{navItems.map((item) => <Pressable testID={`nav-${item.key}`} key={item.key} onPress={() => setSection(item.key)} style={({ pressed }) => [styles.navItem, pressed && styles.pressed]}><View style={[styles.navIcon, section === item.key && styles.navIconActive]}><Icon name={item.icon} size={19} color={section === item.key ? colors.light.primary : colors.light.mutedForeground} /></View><Text style={[styles.navLabel, section === item.key && styles.navLabelActive]}>{item.label}</Text></Pressable>)}</View>{modal === 'schedule' ? <ScheduleModal onClose={() => setModal(null)} /> : modal === 'orderList' ? <OrderListModal onClose={() => setModal(null)} /> : modal === 'ingredientDetail' && selectedIngredient ? <IngredientDetailModal ingredientId={selectedIngredient} onClose={() => setModal(null)} /> : modal && ['ingredient', 'shipment', 'recipe', 'return'].includes(modal) ? <FormModal type={modal as FormModalType} onClose={() => setModal(null)} /> : null}</View>;
+  return <View style={[styles.app, { paddingTop: 0 }]}><View style={{ flex: 1 }}>{content}</View><View style={[styles.bottomNav, { paddingBottom: Platform.OS === 'web' ? 34 : Math.max(insets.bottom, 8), height: Platform.OS === 'web' ? 84 : 72 }]}>{navItems.map((item) => <Pressable testID={`nav-${item.key}`} key={item.key} onPress={() => setSection(item.key)} style={({ pressed }) => [styles.navItem, pressed && styles.pressed]}><View style={[styles.navIcon, section === item.key && styles.navIconActive]}><Icon name={item.icon} size={19} color={section === item.key ? colors.light.primary : colors.light.mutedForeground} /></View><Text style={[styles.navLabel, section === item.key && styles.navLabelActive]}>{item.label}</Text></Pressable>)}</View>{modal === 'schedule' ? <ScheduleModal onClose={() => setModal(null)} /> : modal === 'orderList' ? <OrderListModal onClose={() => setModal(null)} /> : modal === 'ingredientDetail' && selectedIngredient ? <IngredientDetailModal ingredientId={selectedIngredient} onClose={() => setModal(null)} /> : modal && ['ingredient', 'shipment', 'recipe', 'return', 'subcategory'].includes(modal) ? <FormModal type={modal as FormModalType} initialMainCategory={subcategoryMainCategory} onClose={() => setModal(null)} /> : null}</View>;
 }
 
 const styles = StyleSheet.create({
@@ -571,6 +534,8 @@ const styles = StyleSheet.create({
   searchInput: { flex: 1, color: colors.light.foreground, fontFamily: 'Inter_400Regular', fontSize: 14, paddingVertical: 0 },
   chipRow: { gap: 7, paddingBottom: 18 },
   filterLabel: { fontFamily: 'Inter_700Bold', color: colors.light.mutedForeground, fontSize: 10, letterSpacing: 0.7, marginBottom: 7 },
+  filterHint: { fontFamily: 'Inter_400Regular', color: colors.light.mutedForeground, fontSize: 10 },
+  subcategoryHint: { fontFamily: 'Inter_400Regular', color: colors.light.mutedForeground, fontSize: 11, lineHeight: 17, marginBottom: 12 },
   filterChip: { paddingHorizontal: 13, paddingVertical: 8, borderRadius: 20, backgroundColor: colors.light.muted },
   filterChipActive: { backgroundColor: colors.light.primary },
   filterChipText: { fontFamily: 'Inter_500Medium', color: colors.light.mutedForeground, fontSize: 12 },
@@ -590,7 +555,6 @@ const styles = StyleSheet.create({
   emptyCopy: { fontFamily: 'Inter_400Regular', color: colors.light.mutedForeground, fontSize: 12, lineHeight: 18, textAlign: 'center', marginTop: 6, maxWidth: 260 },
   reportSummary: { flexDirection: 'row', backgroundColor: colors.light.primary, borderRadius: 20, padding: 18, marginBottom: 25, alignItems: 'center' },
   reportValue: { fontFamily: 'Inter_700Bold', color: colors.light.primaryForeground, fontSize: 24, marginTop: 8 },
-  reportUnit: { fontFamily: 'Inter_500Medium', fontSize: 12 },
   summaryDivider: { width: 1, height: 46, backgroundColor: 'rgba(255,255,255,0.28)', marginHorizontal: 24 },
   recommendations: { marginBottom: 8 },
   recommendation: { flexDirection: 'row', gap: 12, backgroundColor: colors.light.card, borderRadius: 17, borderWidth: 1, borderColor: colors.light.border, padding: 14, marginBottom: 10 },
