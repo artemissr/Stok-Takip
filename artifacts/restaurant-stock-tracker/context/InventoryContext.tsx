@@ -7,6 +7,12 @@ export type Area = 'Soğuk depo' | 'Kuru depo' | 'Bar' | 'Dondurucu' | 'Sarf mal
 export const MAIN_CATEGORIES: MainCategory[] = ['Bar', 'Mutfak', 'Tezgah'];
 export const AREAS: Area[] = ['Soğuk depo', 'Kuru depo', 'Bar', 'Dondurucu', 'Sarf malzeme'];
 
+export type Subcategory = {
+  id: string;
+  name: string;
+  mainCategory: MainCategory;
+};
+
 export type Ingredient = {
   id: string;
   name: string;
@@ -15,6 +21,7 @@ export type Ingredient = {
   salePrice: number;
   area: Area;
   mainCategory: MainCategory;
+  subcategoryId?: string;
   threshold: number;
   content: string;
   calories: number;
@@ -65,6 +72,7 @@ type InventoryData = {
   recipes: Recipe[];
   sales: Sale[];
   returns: ReturnRecord[];
+  subcategories: Subcategory[];
   schedules: {
     orderDays: number[];
     shipmentDays: number[];
@@ -139,6 +147,7 @@ export const starterData: InventoryData = {
     { id: 'sale-3', recipeId: 'recipe-pasta', quantity: 6, date: today() },
   ],
   returns: [],
+  subcategories: [],
   schedules: { orderDays: [2, 5], shipmentDays: [2, 4, 6] },
 };
 
@@ -148,6 +157,7 @@ type InventoryContextValue = InventoryData & {
   addShipment: (input: Omit<Batch, 'id' | 'receivedAt'>) => void;
   addRecipe: (input: Omit<Recipe, 'id'>) => void;
   addReturn: (input: Omit<ReturnRecord, 'id'>) => void;
+  addSubcategory: (input: Omit<Subcategory, 'id'>) => void;
   updateSchedules: (schedules: InventoryData['schedules']) => void;
   recordSale: (recipeId: string, quantity: number) => boolean;
 };
@@ -163,7 +173,8 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
       .then((saved) => {
         if (saved) {
           try {
-            setData(JSON.parse(saved) as InventoryData);
+            const parsed = JSON.parse(saved) as Partial<InventoryData>;
+            setData({ ...starterData, ...parsed, subcategories: parsed.subcategories ?? [] });
           } catch {
             setData(starterData);
           }
@@ -200,6 +211,11 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
       setData((previous) => ({
         ...previous,
         returns: [...previous.returns, { ...input, id: id('return') }],
+      })),
+    addSubcategory: (input) =>
+      setData((previous) => ({
+        ...previous,
+        subcategories: [...previous.subcategories, { ...input, id: id('subcategory') }],
       })),
     updateSchedules: (schedules) =>
       setData((previous) => ({ ...previous, schedules })),
